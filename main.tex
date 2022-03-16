@@ -56,9 +56,73 @@
 
 % START START START START START START START START START START START START START
 
-\begin{frame}{First slide}
-\vspace{0.5 cm}
-HERE
+\begin{frame}{High-level overview}
+\vspace{0.4 cm}
+\begin{itemize}\setlength{\itemsep}{0.25 cm}
+\item \textcolor{blue}{\href{https://inspirehep.net/literature/1806222}{Awkward Array}} is a library for end-user data analysts to interact with large datasets in Python.
+\begin{itemize}
+\item It's like NumPy, in that it's a collection of routines for {\it manipulating} arrays.
+\item It's like Arrow, in that it represents arbitrary data types using a \textcolor{blue}{\href{https://arrow.apache.org/docs/format/Columnar.html}{columnar format}}.
+\item \textcolor{blue}{\href{https://awkward-array.readthedocs.io/en/latest/ak.layout.Content.html}{Awkward Array's format}} is very similar to Arrow's; conversions are usually zero-copy.
+\end{itemize}
+
+\item<2-> Sits in the middle of an ecosystem of Pythonic tools:
+\begin{itemize}
+\item \textcolor{blue}{\href{https://pypi.org/project/uproot/}{Uproot}} reads ROOT data into Awkward Arrays.
+\item \textcolor{blue}{\href{https://pypi.org/project/coffea/}{Coffea}} builds ROOT schema-specific extensions on top.
+\item \textcolor{blue}{\href{https://pypi.org/project/vector/}{Vector}} implements array-oriented Lorentz vector operations.
+\item \textcolor{blue}{\href{https://pypi.org/project/fastjet/}{fastjet}} (lowercase) runs FastJet (uppercase) on batches of events in Awkward Arrays.
+\item \ldots
+\end{itemize}
+
+\item<3-> Interoperability with C++ is a priority, but ideas on how we'll do that \mbox{are evolving.\hspace{-1 cm}}
+\begin{itemize}
+\item Awkward 1.0 (late 2019) was implemented in C++ with the idea that downstream libraries would link to it. See \textcolor{blue}{\href{https://indico.cern.ch/event/855454/contributions/4605044/}{this talk}} for why that was a bad idea.
+\item Awkward 2.0 (in \mintinline{python}{_v2} submodule) is implemented in Python without sacrificing speed (see page 7 in the above talk) or accessibility in C++ (this talk).
+\end{itemize}
+
+\end{itemize}
 \end{frame}
+
+\begin{frame}{Why the columnar format matters}
+\large
+\vspace{0.5 cm}
+The large ``buffers'' of contiguous data are accessible in both C++ and Python.
+
+\vspace{0.25 cm}
+Only the small tree (number of nodes $\sim$ {\it data type}) combining them into a structure must be managed separately in C++ and Python.
+
+\vspace{-0.25 cm}
+\begin{columns}
+\column{1.15\linewidth}
+\only<1>{\includegraphics[width=\linewidth]{composable-1.pdf}}\only<2>{\includegraphics[width=\linewidth]{composable-2.pdf}}\only<3>{\includegraphics[width=\linewidth]{composable-3.pdf}}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Why the columnar format matters}
+\vspace{0.35 cm}
+\large
+
+Record-oriented data can only be iterated over by procedures that are specialized to the data schema. For large-scale data, they must be compiled/JIT-compiled.
+
+\includegraphics[width=\linewidth]{record-oriented.pdf}
+
+\vspace{0.15 cm}
+\begin{uncoverenv}<2->
+Column-oriented data can be iterated over in two ways: (1)~precompiled routines that only operate on one column, or (2)~a JIT-compiled routine on whole records.
+
+\includegraphics[width=\linewidth]{column-oriented.pdf}
+\end{uncoverenv}
+
+\vspace{-4 cm}
+\hfill \begin{minipage}{0.45\linewidth}
+\uncover<3->{In Awkward Array, the primary interface is a suite of array-at-a-time operations, precompiled and applied to a dynamically typed schema.}
+
+\vspace{0.25 cm}
+\uncover<4->{But we can also do record-at-a-time iteration if we have a JIT-compiler.}
+\end{minipage}
+\vspace{4 cm}
+\end{frame}
+
 
 \end{document}
