@@ -11,7 +11,7 @@
   \setbeamertemplate{footline}[frame number]  % or "page number"
   \setbeamercolor{frametitle}{fg=white}
   \setbeamercolor{footline}{fg=black}
-} 
+}
 
 \usepackage[english]{babel}
 \usepackage[utf8x]{inputenc}
@@ -299,6 +299,83 @@ Implemented using \textcolor{blue}{\href{https://arxiv.org/abs/2102.13516}{Awkwa
 
 \item<4-> Use ROOT's reflection in RDataFrame and Cling: \mintinline{c++}{GetColumnType}, \mintinline{c++}{TClass}, \mintinline{c++}{TListOfDataMembers}, etc. \textcolor{darkblue}{Pro:} user doesn't even need to mess with \mintinline{c++}{LayoutBuilder}---columns just turn into an Awkward Array. \textcolor{darkblue}{Con:} only ROOT, and ``all C++ classes'' is a large set that will never be completely covered.
 \end{enumerate}
+\end{frame}
+
+\begin{frame}[fragile]{This code fills the buffers to copy the triply nested array}
+\vspace{0.25 cm}
+\scriptsize
+\begin{minted}{c++}
+// "array" has type "2097152 * var * var * var * float32"
+// "offsets1", "offsets2", "offsets3" are 1D integer arrays (mutable)
+// "data" is a 1D float32 array (mutable)
+
+offsets1[0] = 0;  int i1 = 0;
+offsets2[0] = 0;  int i2 = 0;
+offsets3[0] = 0;  int i3 = 0;
+                  int i4 = 0;
+
+for (auto inner1 : array) {
+    offsets1[i1 + 1] = offsets1[i1] + inner1.size();
+    i1++;
+    for (auto inner2 : inner1) {
+        offsets2[i2 + 1] = offsets2[i2] + inner2.size();
+        i2++;
+        for (auto inner3 : inner2) {
+            offsets3[i3 + 1] = offsets3[i3] + inner3.size();
+            i3++;
+            for (auto inner4 : inner3) {
+                data[i4] = inner4;
+                i4++;
+}}}}
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{This code views those buffers as a new triply nested array}
+\vspace{0.1 cm}
+\begin{columns}
+\column{1.05\linewidth}
+\scriptsize
+\begin{minted}{python}
+content = {"offsets1": offsets1, "offsets2": offsets2, "offsets3": offsets3, "data": data}
+output = ak._v2.from_buffers(
+    ak._v2.forms.from_json(             # the "Form", a highly detailed, concrete type
+        """{"class": "ListOffsetArray",
+            "offsets": "i32",
+            "content": {
+                "class": "ListOffsetArray",
+                "offsets": "i32",
+                "content": {
+                    "class": "ListOffsetArray",
+                    "offsets": "i32",
+                    "content": {
+                        "class": "NumpyArray",
+                        "primitive": "float32",
+                        "form_key": "data"},
+                    "form_key": "offsets3"},
+                "form_key": "offsets2"},
+            "form_key": "offsets1"}
+        """),
+    2097152,                            # length of array
+    content,                            # where to find the buffers
+    buffer_key="{form_key}",            # how to find the buffers
+)
+\end{minted}
+\end{columns}
+\end{frame}
+
+\begin{frame}{\mbox{ }}
+\Large
+
+The ``expert method'' has no performance issues:
+
+\vspace{0.25 cm}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{l l}
+Iterating over the 3.8 GB sample in C++: & 1.78 seconds \\
+Same, but also filling output arrays: & 2.04 seconds \\
+\end{tabular}
+
+
 \end{frame}
 
 
