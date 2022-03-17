@@ -69,7 +69,7 @@
 \item<2-> Sits in the middle of an ecosystem of Pythonic tools:
 \begin{itemize}
 \item \textcolor{blue}{\href{https://pypi.org/project/uproot/}{Uproot}} reads ROOT data into Awkward Arrays.
-\item \textcolor{blue}{\href{https://pypi.org/project/coffea/}{Coffea}} builds ROOT schema-specific extensions on top.
+\item \textcolor{blue}{\href{https://pypi.org/project/coffea/}{Coffea}} builds schema-specific/HEP-specific extensions on top.
 \item \textcolor{blue}{\href{https://pypi.org/project/vector/}{Vector}} implements array-oriented Lorentz vector operations.
 \item \textcolor{blue}{\href{https://pypi.org/project/fastjet/}{fastjet}} (lowercase) runs FastJet (uppercase) on batches of events in Awkward Arrays.
 \item \ldots
@@ -77,8 +77,8 @@
 
 \item<3-> Interoperability with C++ is a priority, but ideas on how we'll do that \mbox{are evolving.\hspace{-1 cm}}
 \begin{itemize}
-\item Awkward 1.0 (late 2019) was implemented in C++ with the idea that downstream libraries would link to it. See \textcolor{blue}{\href{https://indico.cern.ch/event/855454/contributions/4605044/}{this talk}} for why that was a bad idea.
-\item Awkward 2.0 (in \mintinline{python}{_v2} submodule) is implemented in Python without sacrificing speed (see page 7 in the above talk) or accessibility in C++ (this talk).
+\item Awkward 1.0 (late 2019) was implemented in C++ with the idea that downstream C++ libraries would link to it. See \textcolor{blue}{\href{https://indico.cern.ch/event/855454/contributions/4605044/}{this talk}} for why that was a bad idea.
+\item Awkward 2.0 (in \mintinline{python}{_v2} submodule) is implemented in Python without sacrificing speed (see page 7 of the above talk) or accessibility in C++ (this talk).
 \end{itemize}
 
 \end{itemize}
@@ -102,13 +102,13 @@ Only a small tree (number of nodes scales with data {\it type}) representing the
 \vspace{0.35 cm}
 \large
 
-Record-oriented data can only be iterated over by procedures that are specialized to the data schema. For large-scale data, they must be compiled/JIT-compiled.
+Record-oriented data can only be iterated over by procedures that are specialized to the data schema. To be fast, they must be compiled/JIT-compiled.
 
 \includegraphics[width=\linewidth]{record-oriented.pdf}
 
 \vspace{0.15 cm}
 \begin{uncoverenv}<2->
-Column-oriented data can be iterated over in two ways: (1)~precompiled routines that only operate on one column, or (2)~a JIT-compiled routine on whole records.
+Column-oriented data can be iterated over in two ways: (1)~precompiled routines that only operate on one column, or (2)~JIT-compiled routines on whole records.
 
 \includegraphics[width=\linewidth]{column-oriented.pdf}
 \end{uncoverenv}
@@ -127,7 +127,7 @@ Column-oriented data can be iterated over in two ways: (1)~precompiled routines 
 \vspace{0.1 cm}
 \small
 \begin{minted}{python}
-array = ak._v2.from_parquet("zlib9-jagged3.parquet").tolist()
+array = ak._v2.from_parquet("zlib9-jagged3.parquet")
 builder = ak._v2.ArrayBuilder()
 
 
@@ -140,10 +140,10 @@ def f_python(array, builder):
                     out += inner4
     builder.real(out)
 
-starttime = time.time()
-f_numba(array, builder)
-print("Numba time", time.time() - starttime)   #  <--- 29.3 seconds
 
+starttime = time.time()
+f_python(array, builder)
+print("Python time", time.time() - starttime)   #  <--- 1190 seconds
 print("result", builder.snapshot()[0])
 \end{minted}
 \end{frame}
@@ -165,10 +165,10 @@ def f_numba(array, builder):
                     out += inner4
     builder.real(out)
 
+
 starttime = time.time()
 f_numba(array, builder)
-print("Numba time", time.time() - starttime)   #  <--- 1.72 seconds
-
+print("Numba  time", time.time() - starttime)   #  <--- 1.72 seconds
 print("result", builder.snapshot()[0])
 \end{minted}
 \end{frame}
@@ -183,19 +183,65 @@ builder = ak._v2.ArrayBuilder()
 f_cpp = CppStatements("""
 double out = 0.0;
 for (auto inner1 : array) {
-  for (auto inner2 : inner1) {
-    for (auto inner3 : inner2) {
-      for (auto inner4 : inner3) {
-        out += inner4;
-}}}} builder.real(out);
+    for (auto inner2 : inner1) {
+        for (auto inner3 : inner2) {
+            for (auto inner4 : inner3) {
+                out += inner4;
+}}}}
+builder.real(out);
 """, array=array, builder=builder)
 
 starttime = time.time()
 f_cpp(array=array, builder=builder)
-print("C++   time", time.time() - starttime)   #  <--- 1.78 seconds
-
+print("C++    time", time.time() - starttime)   #  <--- 1.78 seconds
 print("result", builder.snapshot()[0])
 \end{minted}
 \end{frame}
 
+\begin{frame}[fragile]{Comparison of iteration methods}
+\vspace{0.35 cm}
+In Python, record-at-a-time iteration is a disaster: {\bf 1190 seconds} for 3.8 GB of data, because of all the dynamically typed, pointer-chasing, overloaded \mintinline{python}{__getitem__} calls.
+
+\vspace{0.25 cm}
+\begin{uncoverenv}<2->
+If we wanted to do this operation in Python, we'd rather write
+
+\small
+\begin{minted}{python}
+starttime = time.time()
+result = ak._v2.sum(array)
+print("vectorized time", time.time() - starttime)  # <--- 0.3 seconds
+\end{minted}
+\normalsize
+\end{uncoverenv}
+
+\vspace{0.25 cm}
+\uncover<3->{The Numba and C++ backends both take {\bf 1.7 seconds} because they're implemented the same way: borrowed references into the buffers, iterated over by a small (32-byte) stack-allocated \mintinline{c++}{ArrayView}.}
+
+\vspace{0.25 cm}
+\uncover<4->{{\it Decisions} about how to interpret the \mintinline{c++}{ArrayView} \textcolor{gray}{(is it a list of numbers? a list of lists of numbers? a record with fields?)} are made at compile time. The only things that happen at runtime are integer arithmetic and pointer-dereferences.}
+
+\vspace{0.25 cm}
+\uncover<5->{Record-at-a-time iteration is {\it only} efficient with a JIT-compiler.}
+\end{frame}
+
+
+
+
+
+
 \end{document}
+
+
+%% The Numba and C++ backends replace the Python-based tree with a tree implemented as an array, pointing to itself via integer indexes, and a stack-allocated, 32-byte \mintinline{c++}{ArrayView} to track the current position in the array.
+
+%% \small
+%% \begin{minted}{c++}
+%% struct {
+%%     ssize_t start;
+%%     ssize_t stop;
+%%     ssize_t which_node;
+%%     ssize_t* tree_as_an_array;
+%% };
+%% \end{minted}
+%% \normalsize
