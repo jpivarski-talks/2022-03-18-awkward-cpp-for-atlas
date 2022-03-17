@@ -225,9 +225,17 @@ print("vectorized time", time.time() - starttime)  # <--- 0.3 seconds
 \uncover<5->{Record-at-a-time iteration is {\it only} efficient with a JIT-compiler.}
 \end{frame}
 
+\begin{frame}{JIT-compilation with Awkward Array}
+\vspace{0.5 cm}
+\textcolor{darkblue}{Numba:} First attempt in version 0.8.0~(Jan~2019), reimplemented twice, second time with \mintinline{c++}{ArrayView}, for 1.0~(Dec~2020), updated for \mintinline{python}{_v2}~(Feb~2022). \textcolor{violet}{Status: mature.}
 
+\vspace{0.75 cm}
+\textcolor{darkblue}{Clang incremental:} started last week, using a back-door into Clang provided by Vassil Vassilev (\textcolor{blue}{\href{https://gist.github.com/jpivarski/aad015ac893a0d9cca6c6f42a90a9505}{as a Gist, here}}), in \textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/pull/1359}{scikit-hep/awkward-1.0\#1359}}. Vassil hopes to get these changes into llvm-14, but if not, llvm-15. \textcolor{violet}{Status: just started, depends on externals.}
 
+\vspace{0.75 cm}
+\textcolor{darkblue}{RDataFrame/Cling:} thinking about it a year ago (\textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/issues/558}{scikit-hep/awkward-1.0\#558}}), but work started (by Yana Osborne) last month (\textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/pull/1295}{scikit-hep/awkward-1.0\#1295}}). Uses a lot of the same infrastructure as Clang incremental, with extra work for RDataFrame integration. \textcolor{violet}{Status: just started, but a safe bet.}
 
+\end{frame}
 
 
 \end{document}
