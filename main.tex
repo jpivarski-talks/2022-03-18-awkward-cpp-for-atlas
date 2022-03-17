@@ -225,16 +225,80 @@ print("vectorized time", time.time() - starttime)  # <--- 0.3 seconds
 \uncover<5->{Record-at-a-time iteration is {\it only} efficient with a JIT-compiler.}
 \end{frame}
 
-\begin{frame}{JIT-compilation with Awkward Array}
+\begin{frame}{Ways to JIT-compile Awkward Array iterators}
 \vspace{0.5 cm}
-\textcolor{darkblue}{Numba:} First attempt in version 0.8.0~(Jan~2019), reimplemented twice, second time with \mintinline{c++}{ArrayView}, for 1.0~(Dec~2020), updated for \mintinline{python}{_v2}~(Feb~2022). \textcolor{violet}{Status: mature.}
+\textcolor{darkorange}{\bf Numba:} First attempt in version 0.8.0~(Jan~2019), reimplemented twice, second time with \mintinline{c++}{ArrayView}, for 1.0~(Dec~2020), updated for \mintinline{python}{_v2}~(Feb~2022). \textcolor{violet}{Status: mature.}
 
-\vspace{0.75 cm}
-\textcolor{darkblue}{Clang incremental:} started last week, using a back-door into Clang provided by Vassil Vassilev (\textcolor{blue}{\href{https://gist.github.com/jpivarski/aad015ac893a0d9cca6c6f42a90a9505}{as a Gist, here}}), in \textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/pull/1359}{scikit-hep/awkward-1.0\#1359}}. Vassil hopes to get these changes into llvm-14, but if not, llvm-15. \textcolor{violet}{Status: just started, depends on externals.}
+\vspace{0.5 cm}
+\uncover<2->{\textcolor{darkorange}{\bf Clang incremental:} started last week, using a back-door into Clang provided by Vassil Vassilev (\textcolor{blue}{\href{https://gist.github.com/jpivarski/aad015ac893a0d9cca6c6f42a90a9505}{as a Gist, here}}), in \textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/pull/1359}{scikit-hep/awkward-1.0\#1359}}. Vassil hopes to get these changes into llvm-14, but if not, llvm-15. \textcolor{violet}{Status: just started, depends on externals.}}
 
-\vspace{0.75 cm}
-\textcolor{darkblue}{RDataFrame/Cling:} thinking about it a year ago (\textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/issues/558}{scikit-hep/awkward-1.0\#558}}), but work started (by Yana Osborne) last month (\textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/pull/1295}{scikit-hep/awkward-1.0\#1295}}). Uses a lot of the same infrastructure as Clang incremental, with extra work for RDataFrame integration. \textcolor{violet}{Status: just started, but a safe bet.}
+\vspace{0.5 cm}
+\uncover<3->{\textcolor{darkorange}{\bf RDataFrame:} thinking about it a year ago (\textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/issues/558}{scikit-hep/awkward-1.0\#558}}), but work started last month (\textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/pull/1295}{scikit-hep/awkward-1.0\#1295}}) by Yana Osborne. Uses a lot of the same infrastructure as the above, plus RDataFrame integration. Depends on ROOT, but a multiplying effect for analysis productivity. \textcolor{violet}{Status: just started, but a safe bet.}}
 
+\vspace{0.5 cm}
+\uncover<4->{\textcolor{darkorange}{\bf Numba + Cppyy:} Wim Lavrijsen is planning a project to connect Cppyy (PyROOT's C++ interop) with Numba. That would be another way to do it. \textcolor{violet}{Status: future.}}
+\end{frame}
+
+\begin{frame}[fragile]{The other direction: getting data {\it out} of C++}
+\vspace{0.2 cm}
+Our standard method is \mintinline{c++}{ArrayBuilder}, which discovers type as it is filled:
+
+\tiny
+\vspace{-0.05 cm}
+\begin{columns}
+\column{0.93\linewidth}
+\begin{minted}{python}
+builder = ak._v2.ArrayBuilder()
+
+# fill commands           # as JSON      # current array type
+#######################################################################################################
+builder.begin_list()      #  [           # 0 * var * unknown     (initially, the type is unknown)
+builder.integer(1)        #    1,        # 0 * var * int64
+builder.integer(2)        #    2,        # 0 * var * int64
+builder.real(3)           #    3.0       # 0 * var * float64     (all the integers have become floats)
+builder.end_list()        #  ],          # 1 * var * float64
+builder.begin_list()      #  [           # 1 * var * float64
+builder.end_list()        #  ],          # 2 * var * float64
+builder.begin_list()      #  [           # 2 * var * float64
+builder.integer(4)        #    4,        # 2 * var * float64
+builder.null()            #    null,     # 2 * var * ?float64    (now the floats are nullable)
+builder.integer(5)        #    5         # 2 * var * ?float64
+builder.end_list()        #  ],          # 3 * var * ?float64
+builder.begin_list()      #  [           # 3 * var * ?float64
+builder.begin_record()    #    {         # 3 * var * ?union[float64, {}]
+builder.field("x")        #      "x":    # 3 * var * ?union[float64, {"x": unknown}]
+builder.integer(1)        #       1,     # 3 * var * ?union[float64, {"x": int64}]
+builder.field("y")        #       "y":   # 3 * var * ?union[float64, {"x": int64, "y": unknown}]
+builder.begin_list()      #       [      # 3 * var * ?union[float64, {"x": int64, "y": var * unknown}]
+builder.integer(2)        #         2,   # 3 * var * ?union[float64, {"x": int64, "y": var * int64}]
+builder.integer(3)        #         3    # 3 * var * ?union[float64, {"x": int64, "y": var * int64}]
+builder.end_list()        #       ]      # 3 * var * ?union[float64, {"x": int64, "y": var * int64}]
+builder.end_record()      #    }         # 3 * var * ?union[float64, {"x": int64, "y": var * int64}]
+builder.end_list()        #  ]           # 4 * var * ?union[float64, {"x": int64, "y": var * int64}]
+
+array = builder.snapshot()
+\end{minted}
+\end{columns}
+\end{frame}
+
+\begin{frame}{But type-discovery is a speedbump for statically typed data}
+\vspace{0.35 cm}
+\mintinline{c++}{ArrayBuilder} was created to turn Python objects and JSON into Awkward Arrays.
+
+\vspace{0.25 cm}
+If we know the type is \mintinline{c++}{std::vector<std::vector<float>>}, we can do better.
+
+\vspace{0.25 cm}
+\begin{enumerate}\setlength{\itemsep}{0.3 cm}
+\item<2-> \mintinline{c++}{LayoutBuilder}: a version of \mintinline{c++}{ArrayBuilder} that is initialized with a data type. Calling the wrong method raises an exception.
+
+\vspace{0.2 cm}
+Implemented using \textcolor{blue}{\href{https://arxiv.org/abs/2102.13516}{AwkwardForth}}, a lightweight alternative to JIT-compilation. But if we end up using this in contexts where a JIT compiler is available, why not JIT-compile the \mintinline{c++}{LayoutBuilder} itself?
+
+\item<3-> Experts can build layouts directly, now. (Example on next page.)
+
+\item<4-> Use ROOT's reflection in RDataFrame and Cling: \mintinline{c++}{GetColumnType}, \mintinline{c++}{TClass}, \mintinline{c++}{TListOfDataMembers}, etc. \textcolor{darkblue}{Pro:} user doesn't even need to mess with \mintinline{c++}{LayoutBuilder}---columns just turn into an Awkward Array. \textcolor{darkblue}{Con:} only ROOT, and ``all C++ classes'' is a large set that will never be completely covered.
+\end{enumerate}
 \end{frame}
 
 
