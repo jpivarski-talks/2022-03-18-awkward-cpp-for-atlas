@@ -124,5 +124,79 @@ Column-oriented data can be iterated over in two ways: (1)~precompiled routines 
 \vspace{4 cm}
 \end{frame}
 
+\begin{frame}[fragile]{Record-at-a-time iteration without a JIT-compiler}
+\vspace{0.1 cm}
+\small
+\begin{minted}{python}
+array = ak._v2.from_parquet("zlib9-jagged3.parquet").tolist()
+builder = ak._v2.ArrayBuilder()
+
+
+def f_python(array, builder):
+    out = 0.0
+    for inner1 in array:
+        for inner2 in inner1:
+            for inner3 in inner2:
+                for inner4 in inner3:
+                    out += inner4
+    builder.real(out)
+
+starttime = time.time()
+f_numba(array, builder)
+print("Numba time", time.time() - starttime)   #  <--- 29.3 seconds
+
+print("result", builder.snapshot()[0])
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Record-at-a-time iteration with a JIT-compiler: Numba}
+\vspace{0.1 cm}
+\small
+\begin{minted}{python}
+array = ak._v2.from_parquet("zlib9-jagged3.parquet")
+builder = ak._v2.ArrayBuilder()
+
+@nb.njit
+def f_numba(array, builder):
+    out = 0.0
+    for inner1 in array:
+        for inner2 in inner1:
+            for inner3 in inner2:
+                for inner4 in inner3:
+                    out += inner4
+    builder.real(out)
+
+starttime = time.time()
+f_numba(array, builder)
+print("Numba time", time.time() - starttime)   #  <--- 1.72 seconds
+
+print("result", builder.snapshot()[0])
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Record-at-a-time iteration with a JIT-compiler: Clang incremental}
+\vspace{0.1 cm}
+\small
+\begin{minted}{python}
+array = ak._v2.from_parquet("zlib9-jagged3.parquet")
+builder = ak._v2.ArrayBuilder()
+
+f_cpp = CppStatements("""
+double out = 0.0;
+for (auto inner1 : array) {
+  for (auto inner2 : inner1) {
+    for (auto inner3 : inner2) {
+      for (auto inner4 : inner3) {
+        out += inner4;
+}}}} builder.real(out);
+""", array=array, builder=builder)
+
+starttime = time.time()
+f_cpp(array=array, builder=builder)
+print("C++   time", time.time() - starttime)   #  <--- 1.78 seconds
+
+print("result", builder.snapshot()[0])
+\end{minted}
+\end{frame}
 
 \end{document}
