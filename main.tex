@@ -86,13 +86,12 @@
 
 \begin{frame}{Why the columnar format matters}
 \large
-\vspace{0.5 cm}
-The large ``buffers'' of contiguous data are accessible in both C++ and Python.
+\vspace{0.35 cm}
+The large buffers of contiguous data are equally accessible in C++ and Python.
 
 \vspace{0.25 cm}
-Only the small tree (number of nodes $\sim$ {\it data type}) combining them into a structure must be managed separately in C++ and Python.
+Only a small tree (number of nodes scales with data {\it type}) representing the dynamically typed schema must be managed separately in C++ and Python.
 
-\vspace{-0.25 cm}
 \begin{columns}
 \column{1.15\linewidth}
 \only<1>{\includegraphics[width=\linewidth]{composable-1.pdf}}\only<2>{\includegraphics[width=\linewidth]{composable-2.pdf}}\only<3>{\includegraphics[width=\linewidth]{composable-3.pdf}}
@@ -115,11 +114,11 @@ Column-oriented data can be iterated over in two ways: (1)~precompiled routines 
 \end{uncoverenv}
 
 \vspace{-4 cm}
-\hfill \begin{minipage}{0.45\linewidth}
+\hfill \begin{minipage}{0.48\linewidth}
 \uncover<3->{In Awkward Array, the primary interface is a suite of array-at-a-time operations, precompiled and applied to a dynamically typed schema.}
 
 \vspace{0.25 cm}
-\uncover<4->{But we can also do record-at-a-time iteration if we have a JIT-compiler.}
+\uncover<4->{But we can also iterate one record at a time if we have a JIT-compiler.}
 \end{minipage}
 \vspace{4 cm}
 \end{frame}
