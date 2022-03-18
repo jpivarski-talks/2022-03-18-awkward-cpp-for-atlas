@@ -216,7 +216,7 @@ print("vectorized time", time.time() - starttime)  # <--- 0.3 seconds
 \end{uncoverenv}
 
 \vspace{0.25 cm}
-\uncover<3->{The Numba and C++ backends both take {\bf 1.7 seconds} because they're implemented the same way: borrowed references into the buffers, iterated over by a small (32-byte) stack-allocated \mintinline{c++}{ArrayView}.}
+\uncover<3->{The Numba and C++ backends both take {\bf 1.7 seconds} because they're implemented the same way: borrowed references into the buffers, iterated over by a small (32-byte) stack-allocated \mintinline{c++}{ArrayView}. (Same iteration over \mintinline{c++}{std::vectors} is {\bf 12.7 seconds}.)}
 
 \vspace{0.25 cm}
 \uncover<4->{{\it Decisions} about how to interpret the \mintinline{c++}{ArrayView} \textcolor{gray}{(is it a list of numbers? a list of lists of numbers? a record with fields?)} are made at compile time. The only things that happen at runtime are integer arithmetic and pointer-dereferences.}
@@ -225,17 +225,25 @@ print("vectorized time", time.time() - starttime)  # <--- 0.3 seconds
 \uncover<5->{Record-at-a-time iteration is {\it only} efficient with a JIT-compiler.}
 \end{frame}
 
-\begin{frame}{Ways to JIT-compile Awkward Array iterators}
+\begin{frame}[fragile]{Ways to JIT-compile Awkward Array iterators}
 \vspace{0.5 cm}
 \textcolor{darkorange}{\bf Numba:} First attempt in version 0.8.0~(Jan~2019), reimplemented twice, second time with \mintinline{c++}{ArrayView}, for 1.0~(Dec~2020), updated for \mintinline{python}{_v2}~(Feb~2022). \textcolor{violet}{Status: mature.}
 
-\vspace{0.5 cm}
+\vspace{0.25 cm}
 \uncover<2->{\textcolor{darkorange}{\bf Clang incremental:} started last week, using a back-door into Clang provided by Vassil Vassilev (\textcolor{blue}{\href{https://gist.github.com/jpivarski/aad015ac893a0d9cca6c6f42a90a9505}{as a Gist, here}}), in \textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/pull/1359}{scikit-hep/awkward-1.0\#1359}}. Vassil hopes to get these changes into llvm-14, but if not, llvm-15. \textcolor{violet}{Status: just started, depends on externals.}}
 
-\vspace{0.5 cm}
-\uncover<3->{\textcolor{darkorange}{\bf RDataFrame:} thinking about it a year ago (\textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/issues/558}{scikit-hep/awkward-1.0\#558}}), but work started last month (\textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/pull/1295}{scikit-hep/awkward-1.0\#1295}}) by Yana Osborne. Uses a lot of the same infrastructure as the above, plus RDataFrame integration. Depends on ROOT, but a multiplying effect for analysis productivity. \textcolor{violet}{Status: just started, but a safe bet.}}
+\vspace{0.25 cm}
+\begin{uncoverenv}<3->
+\textcolor{darkorange}{\bf RDataFrame:} thinking about it a year ago (\textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/issues/558}{scikit-hep/awkward-1.0\#558}}), but work started last month (\textcolor{blue}{\href{https://github.com/scikit-hep/awkward-1.0/pull/1295}{scikit-hep/awkward-1.0\#1295}}) by Yana Osborne. Uses a lot of the same infrastructure as the above, plus RDataFrame integration. Depends on ROOT, but a multiplying effect for analysis productivity. \textcolor{violet}{Status: just started, but a safe bet.}
 
-\vspace{0.5 cm}
+\small
+\begin{minted}{python}
+rdf = ak._v2.to_rdataframe({"col1": array1, "col2": array2})
+array3 = ak._v2.from_rdataframe(rdf, ["col1", "col2"])
+\end{minted}
+\normalsize
+\end{uncoverenv}
+
 \uncover<4->{\textcolor{darkorange}{\bf Numba + Cppyy:} Wim Lavrijsen is planning a project to connect Cppyy (PyROOT's C++ interop) with Numba. That would be another way to do it. \textcolor{violet}{Status: future.}}
 \end{frame}
 
