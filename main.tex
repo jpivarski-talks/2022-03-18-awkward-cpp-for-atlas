@@ -114,8 +114,8 @@ Column-oriented data can be iterated over in two ways: (1)~precompiled routines 
 \end{uncoverenv}
 
 \vspace{-4 cm}
-\hfill \begin{minipage}{0.48\linewidth}
-\uncover<3->{In Awkward Array, the primary interface is a suite of array-at-a-time operations, precompiled and applied to a dynamically typed schema.}
+\hfill \begin{minipage}{0.44\linewidth}
+\uncover<3->{Awkward Array's primary interface is a suite of array-at-a-time operations, precompiled and applied to a data schema at runtime.}
 
 \vspace{0.25 cm}
 \uncover<4->{But we can also iterate one record at a time if we have a JIT-compiler.}
@@ -123,7 +123,7 @@ Column-oriented data can be iterated over in two ways: (1)~precompiled routines 
 \vspace{4 cm}
 \end{frame}
 
-\begin{frame}[fragile]{Record-at-a-time iteration without a JIT-compiler}
+\begin{frame}[fragile]{Record-at-a-time iteration {\it without} a JIT-compiler}
 \vspace{0.1 cm}
 \small
 \begin{minted}{python}
@@ -143,8 +143,8 @@ def f_python(array, builder):
 
 starttime = time.time()
 f_python(array, builder)
-print("Python time", time.time() - starttime)   #  <--- 1190 seconds
-print("result", builder.snapshot()[0])
+print("Python time", time.time() - starttime)  #  <--- 1190 seconds
+print("result", builder.snapshot()[0])         #       that's slow!
 \end{minted}
 \end{frame}
 
@@ -168,8 +168,8 @@ def f_numba(array, builder):
 
 starttime = time.time()
 f_numba(array, builder)
-print("Numba  time", time.time() - starttime)   #  <--- 1.72 seconds
-print("result", builder.snapshot()[0])
+print("Numba  time", time.time() - starttime)  #  <--- 1.72 seconds
+print("result", builder.snapshot()[0])         #       (good)
 \end{minted}
 \end{frame}
 
@@ -193,8 +193,8 @@ builder.real(out);
 
 starttime = time.time()
 f_cpp(array=array, builder=builder)
-print("C++    time", time.time() - starttime)   #  <--- 1.78 seconds
-print("result", builder.snapshot()[0])
+print("C++    time", time.time() - starttime)  #  <--- 1.78 seconds
+print("result", builder.snapshot()[0])         #       (same)
 \end{minted}
 \end{frame}
 
@@ -301,11 +301,11 @@ Implemented using \textcolor{blue}{\href{https://arxiv.org/abs/2102.13516}{Awkwa
 \end{enumerate}
 \end{frame}
 
-\begin{frame}[fragile]{This code fills the buffers to copy the triply nested array}
+\begin{frame}[fragile]{Expert method: filling buffers to copy the triply nested array}
 \vspace{0.25 cm}
 \scriptsize
 \begin{minted}{c++}
-// "array" has type "2097152 * var * var * var * float32"
+// "array" has Awkward Array type "2097152 * var * var * var * float32" (immutable)
 // "offsets1", "offsets2", "offsets3" are 1D integer arrays (mutable)
 // "data" is a 1D float32 array (mutable)
 
@@ -330,7 +330,7 @@ for (auto inner1 : array) {
 \end{minted}
 \end{frame}
 
-\begin{frame}[fragile]{This code views those buffers as a new triply nested array}
+\begin{frame}[fragile]{Expert method: viewing those buffers as a new triply nested array}
 \vspace{0.1 cm}
 \begin{columns}
 \column{1.05\linewidth}
@@ -391,9 +391,17 @@ Same, but also filling output arrays: & 2.04 seconds \\
 \begin{frame}{Or use the ``expert method'' in ahead-of-time compiled code}
 \vspace{0.18 cm}
 \begin{columns}
-\column{1.15\linewidth}
+\column{1.14\linewidth}
 \includegraphics[width=\linewidth]{fastjet-documentation.png}
 \end{columns}
+\end{frame}
+
+\begin{frame}{\mbox{ }}
+\Large
+\vspace{0.5 cm}
+\begin{center}
+So\ldots for Athena, what kind of interface are you looking for?
+\end{center}
 \end{frame}
 
 \end{document}
