@@ -364,20 +364,37 @@ output = ak._v2.from_buffers(
 \end{frame}
 
 \begin{frame}{\mbox{ }}
-\Large
+\vspace{0.75 cm}
+\large
 
-The ``expert method'' has no performance issues:
+\begin{columns}
+\column{0.8\linewidth}
+\underline{The ``expert method'' has no performance issues:}
 
 \vspace{0.25 cm}
 \renewcommand{\arraystretch}{1.25}
-\begin{tabular}{l l}
+\begin{tabular}{l r}
 Iterating over the 3.8 GB sample in C++: & 1.78 seconds \\
 Same, but also filling output arrays: & 2.04 seconds \\
+\uncover<2->{\textcolor{darkblue}{Using \mintinline{c++}{ArrayBuilder} is much slower:}} & \uncover<2->{\textcolor{darkblue}{218\phantom{.00} seconds}} \\
+\uncover<3->{\textcolor{darkblue}{Using \mintinline{c++}{ArrayBuilder} in Numba:}} & \uncover<3->{\textcolor{darkblue}{48\phantom{.00} seconds}} \\
 \end{tabular}
 
+\vspace{0.5 cm}
+\uncover<4->{\textcolor{gray}{Type-discovery, growing allocation, and calling through external function pointers could all be culprits.}}
 
+\vspace{0.25 cm}
+\uncover<4->{\textcolor{gray}{(The Clang/Numba difference is puzzling, though.)}}
+\end{columns}
 \end{frame}
 
+\begin{frame}{Or use the ``expert method'' in ahead-of-time compiled code}
+\vspace{0.18 cm}
+\begin{columns}
+\column{1.15\linewidth}
+\includegraphics[width=\linewidth]{fastjet-documentation.png}
+\end{columns}
+\end{frame}
 
 \end{document}
 
